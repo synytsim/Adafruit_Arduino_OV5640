@@ -1,1 +1,1 @@
-Adafruit OV5640 library for Arduino
+Arduino driver for Adafruit OV5640 camera

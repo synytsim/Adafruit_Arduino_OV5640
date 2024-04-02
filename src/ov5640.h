@@ -9,6 +9,7 @@ Arduino driver for adafruit OV5640 camera
 
 #include "Arduino.h"
 #include "Wire.h"
+#include "wiring_private.h"
 
 #define OV5640_COLOR_RGB 0
 #define OV5640_COLOR_YUV 1
@@ -67,42 +68,47 @@ Arduino driver for adafruit OV5640 camera
 // Bit[3:0]: X address start[11:8]
 #define _X_ADDR_ST_L 0x3801
 // Bit[7:0]: X address start[7:0]
-#define _X_ADDR_ST_H 0x3802
+#define _Y_ADDR_ST_H 0x3802
 // Bit[2:0]: Y address start[10:8]
-#define _X_ADDR_ST_L 0x3803
+#define _Y_ADDR_ST_L 0x3803
+
 // Bit[7:0]: Y address start[7:0]
 #define _X_ADDR_END_H 0x3804
 // Bit[3:0]: X address end[11:8]
 #define _X_ADDR_END_L 0x3805
 // Bit[7:0]:
-#define _X_ADDR_END_H 0x3806
+#define _Y_ADDR_END_H 0x3806
 // Bit[2:0]: Y address end[10:8]
-#define _X_ADDR_END_L 0x3807
+#define _Y_ADDR_END_L 0x3807
+
 // Bit[7:0]:
 // Size after scaling
 #define _X_OUTPUT_SIZE_H 0x3808
 // Bit[3:0]: DVP output horizontal width[11:8]
 #define _X_OUTPUT_SIZE_L 0x3809
 // Bit[7:0]:
-#define _X_OUTPUT_SIZE_H 0x380A
+#define _Y_OUTPUT_SIZE_H 0x380A
 // Bit[2:0]: DVP output vertical height[10:8]
-#define _X_OUTPUT_SIZE_L 0x380B
+#define _Y_OUTPUT_SIZE_L 0x380B
+
 // Bit[7:0]:
 #define _X_TOTAL_SIZE_H 0x380C
 // Bit[3:0]: Total horizontal size[11:8]
 #define _X_TOTAL_SIZE_L 0x380D
 // Bit[7:0]:
-#define _X_TOTAL_SIZE_H 0x380E
+#define _Y_TOTAL_SIZE_H 0x380E
 // Bit[7:0]: Total vertical size[15:8]
-#define _X_TOTAL_SIZE_L 0x380F
+#define _Y_TOTAL_SIZE_L 0x380F
+
 // Bit[7:0]:
 #define _X_OFFSET_H 0x3810
 // Bit[3:0]: ISP horizontal offset[11:8]
 #define _X_OFFSET_L 0x3811
 // Bit[7:0]:
-#define _X_OFFSET_H 0x3812
+#define _Y_OFFSET_H 0x3812
 // Bit[2:0]: ISP vertical offset[10:8]
-#define _X_OFFSET_L 0x3813
+#define _Y_OFFSET_L 0x3813
+
 // Bit[7:0]:
 #define _X_INCREMENT 0x3814
 // Bit[7:4]: Horizontal odd subsample increment
@@ -295,7 +301,7 @@ Arduino driver for adafruit OV5640 camera
 #define _ASPECT_RATIO_1X1 7
 #define _ASPECT_RATIO_9X16 8
 
-const int _resolution_info[17][3] = {
+const int _resolution_info[18][3] = {
     {96, 96, _ASPECT_RATIO_1X1},  // 96x96
     {160, 120, _ASPECT_RATIO_4X3},  // QQVGA
     {176, 144, _ASPECT_RATIO_5X4},  // QCIF
@@ -331,7 +337,7 @@ const int _resolution_info[17][3] = {
 
 
 const int _ratio_table[9][10] = {
-    //  mw,   mh,  sx,  sy,   ex,   ey, ox, oy,   tx,   ty
+    // mw,  mh, sx, sy, ex,   ey,   ox, oy,  tx,   ty
     {2560, 1920, 0, 0, 2623, 1951, 32, 16, 2844, 1968},  // 4x3
     {2560, 1704, 0, 110, 2623, 1843, 32, 16, 2844, 1752},  // 3x2
     {2560, 1600, 0, 160, 2623, 1791, 32, 16, 2844, 1648},  // 16x10
@@ -343,13 +349,13 @@ const int _ratio_table[9][10] = {
     {1088, 1920, 736, 0, 1887, 1951, 32, 16, 1884, 1968},  // 9x16
 };
 
-const int _pll_pre_div2x_factors[9] = {1, 1, 2, 3, 4, 1.5, 6, 2.5, 8};
+const float _pll_pre_div2x_factors[9] = {1, 1, 2, 3, 4, 1.5, 6, 2.5, 8};
 const int _pll_pclk_root_div_factors[4] = {1,2,4,8};
 
-//define _REG_DLY = 0xFFFF
-//define _REGLIST_TAIL = 0x0000
+#define _REG_DLY 0xFFFF
+#define _REGLIST_TAIL = 0x0000
 
-const int _sensor_default_regs[272] = {
+const int _sensor_default_regs[] = {
     _SYSTEM_CTROL0, 0x82,  // software reset
     _REG_DLY, 10,  // delay 10ms
     _SYSTEM_CTROL0, 0x42,  // power down
@@ -503,10 +509,10 @@ const int _sensor_default_regs[272] = {
     0x3008, 0x02,
     // 50Hz
     0x3C00, 0x04,
-    //_REG_DLY, 300,
+    _REG_DLY, 300
 };
 
-_reset_awb[246] = {
+const int _reset_awb[] = {
     _ISP_CONTROL_01, 0x83,  // turn color matrix, awb and SDE
     // sys reset
     _SYSTEM_RESET00, 0x00, // enable all blocks
@@ -647,7 +653,7 @@ _reset_awb[246] = {
     0x501D, 0x40,  // enable manual offset of contrast
 };
 
-const int _sensor_format_jpeg[10] = {
+const int _sensor_format_jpeg[] = {
     _FORMAT_CTRL, 0x00,  // YUV422
     _FORMAT_CTRL00, 0x30,  // YUYV
     _SYSTEM_RESET02, 0x00,  // enable everything
@@ -655,36 +661,36 @@ const int _sensor_format_jpeg[10] = {
     0x471C, 0x50,  // 0xd0 to 0x50 !!!
 };
 
-const int _sensor_format_raw[4] = {
+const int _sensor_format_raw[] = {
     _FORMAT_CTRL, 0x03,  // RAW (DPC)
     _FORMAT_CTRL00, 0x00,  // RAW
 };
 
-const int _sensor_format_grayscale[4] = {
+const int _sensor_format_grayscale[] = {
     _FORMAT_CTRL, 0x00,  // YUV422
     _FORMAT_CTRL00, 0x10,  // Y8
 };
 
-const int _sensor_format_yuv422[4] = {
+const int _sensor_format_yuv422[] = {
     _FORMAT_CTRL, 0x00,  // YUV422
     _FORMAT_CTRL00, 0x30,  // YUYV
 };
 
-const int _sensor_format_rgb565[8] = {
+const int _sensor_format_rgb565[] = {
     _FORMAT_CTRL, 0x01,  // RGB
     _FORMAT_CTRL00, 0x61,  // RGB565 (BGR)
     _SYSTEM_RESET02, 0x1C, // reset jfifo, sfifo, jpg, fmux, avg
     _CLOCK_ENABLE02, 0xC3, // reset to how it was before (no jpg clock)
 };
 
-const int* _ov5640_color_settings[4] = {
-    _sensor_format_rgb565,
-    _sensor_format_yuv422,
-    _sensor_format_grayscale,
-    _sensor_format_jpeg,
-};
-
 const int _ov5640_color_settings_size[4] = { 8, 4, 4, 10 };
+
+// const int* _ov5640_color_settings[4] = {
+//     _sensor_format_rgb565,
+//     _sensor_format_yuv422,
+//     _sensor_format_grayscale,
+//     _sensor_format_jpeg,
+// };
 
 const int _contrast_settings[7][2] = {
     {0x20, 0x00}, //  0
@@ -724,7 +730,7 @@ const int _sensor_ev_levels[7][6] = {
 #define OV5640_WHITE_BALANCE_CLOUDY 3
 #define OV5640_WHITE_BALANCE_INCANDESCENT 4
 
-const int _light_registers[7] = {0x3406, 0x3400, 0x3401, 0x3402, 0x3403, 0x3404, 0x3405}
+const int _light_registers[7] = { 0x3406, 0x3400, 0x3401, 0x3402, 0x3403, 0x3404, 0x3405 };
 const int _light_modes[5][7] = {
     {0x00, 0x04, 0x00, 0x04, 0x00, 0x04, 0x00}, // auto
     {0x01, 0x06, 0x1c, 0x04, 0x00, 0x04, 0xf3}, // sunny
@@ -837,9 +843,9 @@ class _RegBits
     
         _RegBits(int reg, int shift, int mask);
 
-        int __get__(OV5640* obj = NULL);
+        // int __get__(void* obj) const;
 
-        void __set__(OV5640* obj = NULL, int value);
+        // void __set__(void* obj, int value);
 };
 
 class _RegBits16
@@ -854,15 +860,15 @@ class _RegBits16
 
         _RegBits16(int reg, int shift, int mask);
 
-        int __get__(OV5640* obj = NULL);
+        // int __get__(void* obj) const;
 
-        void __set__(OV5640* obj = NULL, int value);
+        // void __set__(void* obj, int value);
 };
 
 class _SCCB16CameraBase
 {
     protected:
-
+    
         int _colorspace;
         bool _flip_x;
         bool _flip_y;
@@ -874,16 +880,15 @@ class _SCCB16CameraBase
         int _scale;
         int _ev;
         int _white_balance;
-        int _size;
         int _saturation;
         int _effect;
-
-    private:
-        int _address;
+        TwoWire *_i2c_device;
+        //int *_i2c_bus;
+        uint8_t _i2c_address;
 
     public:
     
-        _SCCB16CameraBase(int i2c_address);
+        //_SCCB16CameraBase();
 
         void _write_register(int reg, int value);
 
@@ -895,7 +900,9 @@ class _SCCB16CameraBase
 
         int _read_register16(int reg);
 
-        void _write_list(int* reg_list, int reg_list_size);
+        //void _write_list(int* reg_list, int reg_list_size);
+
+        void _write_list(const int* reg_list, int reg_list_size);
 
         void _write_reg_bits(int reg, int mask, bool enable);
         
@@ -909,13 +916,11 @@ class OV5640 : public _SCCB16CameraBase
         int* data_pins;
         int clock;
         int vsync;
-        int hsync;
         int href;
         int shutdown;
         int reset;
         int mclk;
         int mclk_frequency;
-        int i2c_address;
         int size;
 
         _RegBits16* chip_id;
@@ -929,6 +934,10 @@ class OV5640 : public _SCCB16CameraBase
         void _set_pll(bool bypass, int multiplier, int sys_div, int pre_div, bool root_2x, int pclk_root_div, bool pclk_manual, int pclk_div);
 
         void _write_group_3_settings(int* settings);
+
+        // static void ready();
+        // static void suspend();
+        // static void parallelRead();
 
 
     public:
@@ -958,15 +967,21 @@ class OV5640 : public _SCCB16CameraBase
             size (int): The captured image size
         */
 
-        OV5640(int* data_pins, int clock, int vsync, int href, int shutdown = -1, int reset = -1, int mclk = -1, int mclk_frequency = 120000000, int i2c_address = 0x3C, int size = OV5640_SIZE_QQVGA);
+        OV5640(TwoWire *i2c_device, int* data_pins, int clock, int vsync, int href, int shutdown = -1, int reset = -1, int mclk = -1, int mclk_frequency = 120000000, int i2c_address = 0x3C, int size = OV5640_SIZE_QQVGA);
 
         ~OV5640();
 
-        void capture(int* buf);
+        int getChipId();
 
-        int capture_buffer_size() const;
+        void init();
 
-        int mclk_frequency() const;
+        void capture();
+
+        void dump();
+
+        int capture_buffer_size();
+
+        int get_mclk_frequency() const;
 
         int width() const;
 
@@ -974,11 +989,11 @@ class OV5640 : public _SCCB16CameraBase
 
         int colorspace() const;
 
-        void colorspace(int colorspace)
+        void colorspace(int colorspace);
     
-        int size() const;
+        int getSize() const;
 
-        void size(int size);
+        void setSize(int size);
 
         bool flip_x() const;
 
