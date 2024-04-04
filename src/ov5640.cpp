@@ -1,57 +1,6 @@
 #include "ov5640.h"
 
-_RegBits::_RegBits(int reg, int shift, int mask) {
-    this->reg = reg;
-    this->shift = shift;
-    this->mask = mask;
-}
-
-// int _RegBits::__get__(void* obj) const {
-//     int reg_value = obj->_read_register(this->reg);
-//     return (reg_value >> this->shift) & this->mask;
-// }
-
-// void _RegBits::__set__(void* obj, int value) {
-//     if (value & ~this->mask) {
-//         Serial.printf("Value 0x%02x does not fit in mask 0x%02x\r\n", value, this->mask);
-//         return;
-//     }
-
-//     int reg_value = obj->_read_register(this->reg);
-//     reg_value &= ~(this->mask << this->shift);
-//     reg_value |= value << this->shift;
-//     obj->_write_register(this->reg, reg_value);
-// }
-
-_RegBits16::_RegBits16(int reg, int shift, int mask) {
-    this->reg = reg;
-    this->shift = shift;
-    this->mask = mask;
-}
-
-// int _RegBits16::__get__(void* obj) const {
-//     int reg_value = obj._read_register16(this->reg);
-//     return (reg_value >> this->shift) & this->mask;
-// }
-
-// void _RegBits16::__set__(void* obj, int value) {
-//     if (value & ~this->mask) {
-//         Serial.printf("Value 0x%02x does not fit in mask 0x%02x\r\n", value, this->mask);
-//         return;
-//     }
-//     int reg_value = obj->_read_register16(this->reg);
-//     reg_value &= ~(this->mask << this->shift);
-//     reg_value |= value << this->shift;
-//     obj->_write_register16(this->reg, reg_value);
-// }
-
-
-// _SCCB16CameraBase::_SCCB16CameraBase(int i2c_address) {
-//     this->_address = i2c_address;
-// }
-
 void _SCCB16CameraBase::_write_register(int reg, int value) {
-    reg &= 0xFFFF;
     byte b[3];
     b[0] = reg >> 8;
     b[1] = reg & 0xFF;
@@ -63,21 +12,12 @@ void _SCCB16CameraBase::_write_register(int reg, int value) {
 
     int numByteSent = 0;
     this->_i2c_device->beginTransmission(this->_i2c_address);
-
-    //while (this->_i2c_device->available());
-    //numByteSent += this->_i2c_device->write(b);
-
-    //numByteSent = this->_i2c_device->write(reg);
-    // numByteSent += this->_i2c_device->write(reg);
-    // numByteSent += this->_i2c_device->write(value);
     numByteSent = this->_i2c_device->write(b, 3);
-    // numByteSent += this->_i2c_device->write(b[0]);
-    // numByteSent += this->_i2c_device->write(b[1]);
-    // numByteSent += this->_i2c_device->write(b[2]);
     int result = this->_i2c_device->endTransmission();
-    //return;
+
     if (result != 0) Serial.printf("write to register 0x%.2X failed, error: %d\r\n", reg, result);
-    //else Serial.printf("write to register 0x%.2X success, wrote %d bytes\r\n", reg, numByteSent);
+    //delay(300);
+    else Serial.printf("write to register 0x%.2X success, wrote %d bytes\r\n", reg, numByteSent);
 }
 
 void _SCCB16CameraBase::_write_addr_reg(int reg, int x_value, int y_value) {
@@ -88,44 +28,21 @@ void _SCCB16CameraBase::_write_addr_reg(int reg, int x_value, int y_value) {
 void _SCCB16CameraBase::_write_register16(int reg, int value) {
     this->_write_register(reg, value >> 8);
     this->_write_register(reg + 1, value & 0xFF);
-    // byte b[6];
-    // b[0] = reg >> 8;
-    // b[1] = reg & 0xFF;
-    // b[2] = value >> 8;
-    // b[3] = (reg + 1) >> 8;
-    // b[4] = (reg + 1) & 0xFF;
-    // b[5] = (value & 0xFF);
-
-    // int numByteSent = 0;
-    // this->_i2c_device->beginTransmission(this->_i2c_address);
-    // numByteSent += this->_i2c_device->write(b, sizeof(byte) * 6);
-    // int result = this->_i2c_device->endTransmission();
-
-    // if (result != 0) {
-    //     Serial.printf("write register16 0x%.2X failed, error: %d\r\n", reg, result);
-    // } else {
-    //     Serial.printf("write register16 0x%.2X success, wrote %d bytes\r\n", reg, numByteSent);
-    // }
 }
 
 int _SCCB16CameraBase::_read_register(int reg) {
-    reg &= 0xFFFF;
     byte b[2];
     b[0] = reg >> 8;
     b[1] = reg & 0xFF;
 
     this->_i2c_device->beginTransmission(this->_i2c_address);
     this->_i2c_device->write(b, 2);
-    //this->_i2c_device->write(b);
-    // this->_i2c_device->write(b[0]);
-    // this->_i2c_device->write(b[1]);
-    //this->_i2c_device->write(reg);
     this->_i2c_device->endTransmission();
 
     this->_i2c_device->requestFrom(this->_i2c_address, 1);
-    //while (this->_i2c_device->available()) {
-    b[0] = this->_i2c_device->read();
-    //}
+    while (this->_i2c_device->available()) {
+        b[0] = this->_i2c_device->read();
+    }
 
     Serial.printf("reading from register 0x%.2X, returned: %d\r\n", reg, b[0]);
     return b[0];
@@ -143,11 +60,8 @@ void _SCCB16CameraBase::_write_list(const int* reg_list, int reg_list_size) {
         int reg = reg_list[i];
         int value = reg_list[i + 1];
 
-        if (reg == _REG_DLY) {
-            delay(value);
-            continue;
-        }
-        this->_write_register16(reg, value);
+        if (reg == _REG_DLY) delay(value);
+        else this->_write_register(reg, value);
     }
 }
 
@@ -175,84 +89,63 @@ OV5640::OV5640(TwoWire* i2c_device, int* data_pins, int pixel_clock, int vsync, 
 }
 
 void OV5640::init(void) {
-
-    this->chip_id = new _RegBits16(_CHIP_ID_HIGH, 0, 0xFFFF);
     
-    //delay(1000);
 
-    pinMode(this->reset, OUTPUT);
-    digitalWrite(this->reset, LOW);
-
-    delay(200);
-
-    pinMode(this->reset, INPUT);
-
-    delay(200);
-
-    
-    //Serial.println("Pins set"); 
-
-    // delay(500);
-
-    //this->_i2c_device->begin();
+    // this->_i2c_device->begin();
     // this->_i2c_device->setClock(100000);
 
-    // delay(500);
+    // delay(1); 
 
-    // this->_write_register(0x503D, 1);
-    // Serial.println(_read_register(0x503D));
+    if (this->reset > 0)
+    pinMode(this->reset, OUTPUT);
+    digitalWrite(this->reset, HIGH);
+    delay(2);
+    digitalWrite(this->reset, LOW);
+    delay(2);
 
-    //delay(500);
+    digitalWrite(this->reset, HIGH);
+    pinMode(this->reset, INPUT);
 
-    this->_i2c_device->begin();
+    delay(20);
 
-    while(_i2c_device->available())
-        ;
 
     this->_write_list(_sensor_default_regs, int(sizeof(_sensor_default_regs) / sizeof(int)));
 
-    // while (this->_i2c_device->available()) {
-    //     this->_i2c_device->read();
-    // }
-
-    this->_i2c_device->end();
-
-
-    this->_colorspace = OV5640_COLOR_RGB;
-    // this->_flip_x = 0;
-    // this->_flip_y = 0;
-    // this->_w = 0;
-    // this->_h = 0;
-    // this->_size = 
-
-    // noInterrupts();
-
-    // PCC->MR.bit.PCEN = 0x0;
+    PCC->MR.bit.PCEN = 0;
     //Serial.println(PCC->MR.bit.PCEN);
     //delay(1000);
-    // MCLK->APBDMASK.bit.PCC_ = 1;
 
-    // PCC->IDR.bit.OVRE = 1;
-    // PCC->IDR.bit.DRDY = 1;
+    PCC->IDR.reg = 0b1111;       // Disable all PCC interrupts
+    // PCC->IER.reg = 0b0000;       // Disable all PCC interrupts
+    MCLK->APBDMASK.bit.PCC_ = 1;
+
+
+    // PCC->IDR.bit.OVRE = 0;
+    // PCC->IDR.bit.DRDY = 0;
     // PCC->IER.bit.OVRE = 1;
     // PCC->IER.bit.DRDY = 1;
 
     // Serial.println(PCC->IMR.bit.DRDY, BIN);
     // Serial.println(PCC->IMR.bit.OVRE, BIN);
 
-    // pinPeripheral(this->clock, PIO_PCC);
-    // pinPeripheral(this->vsync, PIO_PCC);
-    // pinPeripheral(this->href, PIO_PCC);
-    // pinPeripheral(this->data_pins[0], PIO_PCC);
-    // pinPeripheral(this->data_pins[1], PIO_PCC);
-    // pinPeripheral(this->data_pins[2], PIO_PCC);
-    // pinPeripheral(this->data_pins[3], PIO_PCC);
-    // pinPeripheral(this->data_pins[4], PIO_PCC);
-    // pinPeripheral(this->data_pins[5], PIO_PCC);
-    // pinPeripheral(this->data_pins[6], PIO_PCC);
-    // pinPeripheral(this->data_pins[7], PIO_PCC);
+    pinPeripheral(this->clock, PIO_PCC);
+    pinPeripheral(this->vsync, PIO_PCC);
+    pinPeripheral(this->href, PIO_PCC);
+    pinPeripheral(this->data_pins[0], PIO_PCC);
+    pinPeripheral(this->data_pins[1], PIO_PCC);
+    pinPeripheral(this->data_pins[2], PIO_PCC);
+    pinPeripheral(this->data_pins[3], PIO_PCC);
+    pinPeripheral(this->data_pins[4], PIO_PCC);
+    pinPeripheral(this->data_pins[5], PIO_PCC);
+    pinPeripheral(this->data_pins[6], PIO_PCC);
+    pinPeripheral(this->data_pins[7], PIO_PCC);
 
-    // // Accumulate 4 bytes into RHR register (two 16-bit pixels)
+    //Accumulate 4 bytes into RHR register (two 16-bit pixels)
+    PCC->MR.reg = PCC_MR_CID(0x1) |   // Clear on falling DEN1 (VSYNC)
+                PCC_MR_ISIZE(0x0) | // Input data bus is 8 bits
+                PCC_MR_DSIZE(0x2);  // "4 data" at a time (accumulate in RHR)
+
+    // Accumulate 4 bytes into RHR register (two 16-bit pixels)
     // PCC->MR.reg = PCC_MR_CID(0x1) |   // Clear on falling DEN1 (VSYNC)
     //             PCC_MR_ISIZE(0x0) | // Input data bus is 8 bits
     //             PCC_MR_FRSTS(0x0) |
@@ -260,39 +153,36 @@ void OV5640::init(void) {
     //             PCC_MR_ALWYS(0x0) |
     //             PCC_MR_SCALE(0x0) |
     //             PCC_MR_DSIZE(0x2);  // "4 data" at a time (accumulate in RHR)
+    
+    PCC->MR.bit.PCEN = 1;
 
-    // PCC->MR.bit.CID = 0x1;
-    // PCC->MR.bit.ISIZE = 0x0;
-    // PCC->MR.bit.FRSTS = 0x0;
-    // PCC->MR.bit.HALFS = 0x0;
-    // PCC->MR.bit.ALWYS = 0x0;
-    // PCC->MR.bit.SCALE = 0x0;
-    // PCC->MR.bit.DSIZE = 0x2;
-
-    // PCC->MR.bit.PCEN = 0x1;
+    this->_colorspace = OV5640_COLOR_RGB;
+    this->_flip_x = 0;
+    this->_flip_y = 0;
+    this->_w = 0;
+    this->_h = 0;
+    this->_size = 0;
+    this->_binning = 0;
+    this->_scale = 0;
+    this->_ev = 0;
+    this->_white_balance = 0;
+    this->size = size;
 
 }
 
 OV5640::~OV5640() {
-    delete chip_id;
+    // delete chip_id;
 }
 
 int OV5640::getChipId(void) {
     return this->_read_register16(_CHIP_ID_HIGH);
 }
 
-// volatile bool frameReady = 0;
-// volatile bool camSuspend = 1;
-// //static volatile bool pixelClk = 0;
-
-// volatile uint32_t bufPos = 0;
-
-//volatile byte* buf = NULL;
-
 uint16_t *buf = NULL;
 
 // PARALLEL CAPTURE STUFF!!!!
 void OV5640::capture(void) {
+
     Serial.println("Attemping capture...");
 
     uint32_t bufSize = capture_buffer_size();
@@ -321,7 +211,7 @@ void OV5640::capture(void) {
     vsync_bit = 1ul << g_APinDescription[this->vsync].ulPin;
     hsync_reg = &PORT->Group[g_APinDescription[this->href].ulPort].IN.reg;
     hsync_bit = 1ul << g_APinDescription[this->href].ulPin;
-    //delay(500);
+    delay(500);
 
     // while(tempBufIdx < tempBufferSize) {
     //     //Serial.printf("%08lx\r\n", __builtin_bswap32(PCC->RHR.reg));
@@ -339,28 +229,54 @@ void OV5640::capture(void) {
 
     // }
 
-    while(1) {
-        if (PCC->ISR.bit.DRDY) Serial.println(1);
-    }
-
     uint32_t *bufPtr = (uint32_t*)buf;
+
+    // uint16_t width = this->_w / 2;
+
+    // for (uint16_t y = 0; y < this->_h; y++) {
+    //     for (int x = 0; x < width; x++) {
+    //         while (PCC->ISR.bit.DRDY == 0)
+    //             ;
+    //         *bufPtr++ = PCC->RHR.reg;
+    //     }
+    // }
+
+    // while(bufferIdx < bufferSize) {
+    //     //Serial.println("A");
+    //     if (!PCC->ISR.bit.DRDY) {
+    //         *bufPtr++ = PCC->RHR.reg;
+    //         //Serial.println("B");
+    //     }
+    // }
+
+    //return;
+
+
+    //Serial.println("A");
+
 
     while(*vsync_reg & vsync_bit)
         ;
-    //noInterrupts();
-    while(!(*vsync_reg & vsync_bit))
+    //Serial.println("A");
+
+    noInterrupts();
+
+    while(!*vsync_reg & vsync_bit)
         ;
+    //Serial.println("B");
 
     uint16_t width = this->_w / 2;
 
     for (uint16_t y = 0; y < this->_h; y++) {
         while (*hsync_reg & hsync_bit)
             ;
-        while (!(*hsync_reg & hsync_bit))
+        //Serial.println("C");
+        while (!*hsync_reg & hsync_bit)
             ;
+        //Serial.println("D");
 
         for (int x = 0; x < width; x++) {
-            while (PCC->ISR.bit.DRDY == 0)
+            while (!PCC->ISR.bit.DRDY)
                 ;
             //Serial.println("a");
             *bufPtr++ = PCC->RHR.reg;
@@ -368,27 +284,14 @@ void OV5640::capture(void) {
         }
     }
 
-    //interrupts();
+    interrupts();
 
     // PCC->WPMR.bit.WPEN = 0;
-    // PCC->MR.bit.PCEN = 0;
+    //PCC->MR.bit.PCEN = 0;
     // PCC->WPMR.bit.WPEN = 1;
 
     Serial.println("capture done");
 }
-
-// void OV5640::ready(void) {
-//     //interrupts();
-//     //Serial.println("wtf2");
-//     frameReady = 1;
-// }
-
-// void OV5640::suspend(void) {
-//     //interrupts();
-//     //if (frameReady == 1) camSuspend = !camSuspend;
-//     camSuspend = !camSuspend;
-//     //Serial.println("ok?");
-// }
 
 void OV5640::dump(void) {
     Serial.println("Dumping buffer...");
@@ -405,7 +308,7 @@ void OV5640::dump(void) {
 }
 
 int OV5640::capture_buffer_size(void) {
-    if (this->_colorspace == OV5640_COLOR_JPEG) return this->_w * this->_h / quality();
+    if (this->_colorspace == OV5640_COLOR_JPEG) return (this->_w * this->_h) / quality();
     if (this->_colorspace == OV5640_COLOR_GRAYSCALE) return this->_w * this->_h;
     return this->_w * this->_h * 2;
 }
@@ -432,7 +335,10 @@ void OV5640::colorspace(int colorspace) {
 }
 
 void OV5640::_set_image_options(void) {
-    int reg20(0), reg21(0), reg4514(0), reg4514_test(0);
+    int reg20 = 0;
+    int reg21 = 0;
+    int reg4514 = 0;
+    int reg4514_test = 0;
 
     if (this->_colorspace == OV5640_COLOR_JPEG) reg21 |= 0x20;
 
@@ -479,7 +385,7 @@ void OV5640::_set_image_options(void) {
 
 void OV5640::_set_colorspace(void) {
     int _cs = this->_colorspace;
-    int size = _ov5640_color_settings_size[_cs];
+    // int size = _ov5640_color_settings_size[_cs];
 
     if (_cs == 0) this->_write_list(_sensor_format_rgb565, int(sizeof(_sensor_format_rgb565) / sizeof(int)));
     else if (_cs == 1) this->_write_list(_sensor_format_yuv422, int(sizeof(_sensor_format_yuv422) / sizeof(int)));
@@ -493,36 +399,36 @@ int OV5640::getSize(void) const {
 
 void OV5640::_set_size_and_colorspace(void) {
     int size = this->_size;
-    const int* _this_resolution_info = _resolution_info[size];
-    int width = _this_resolution_info[0];
-    int height = _this_resolution_info[1];
-    int ratio = _this_resolution_info[2];
+    //const int* _this_resolution_info = _resolution_info[size];
+    int width = _resolution_info[size][0];
+    int height = _resolution_info[size][1];
+    int ratio = _resolution_info[size][2];
 
     this->_w = width;
     this->_h = height;
 
     
-    const int* _this_ratio_table = _ratio_table[ratio];
+    //const int* _this_ratio_table = _ratio_table[ratio];
 
-    int max_width = _this_ratio_table[0];
-    int max_height = _this_ratio_table[1];
-    int start_x = _this_ratio_table[2];
-    int start_y = _this_ratio_table[3];
-    int end_x = _this_ratio_table[4];
-    int end_y = _this_ratio_table[5];
-    int offset_x = _this_ratio_table[6];
-    int offset_y = _this_ratio_table[7];
-    int total_x = _this_ratio_table[8];
-    int total_y = _this_ratio_table[9];
+    int max_width = _ratio_table[ratio][0];
+    int max_height = _ratio_table[ratio][1];
+    int start_x = _ratio_table[ratio][2];
+    int start_y = _ratio_table[ratio][3];
+    int end_x = _ratio_table[ratio][4];
+    int end_y = _ratio_table[ratio][5];
+    int offset_x = _ratio_table[ratio][6];
+    int offset_y = _ratio_table[ratio][7];
+    int total_x = _ratio_table[ratio][8];
+    int total_y = _ratio_table[ratio][9];
 
     this->_binning = (width <= max_width / 2) && (height <= max_height / 2);
 
     this->_scale = !((width == max_width && height == max_height) || (width == max_width / 2 && height == max_height / 2));
 
-    this->_i2c_device->begin();
+    //this->_i2c_device->begin();
 
-    while(_i2c_device->available())
-        ;
+    // while(_i2c_device->available())
+    //     ;
 
     this->_write_addr_reg(_X_ADDR_ST_H, start_x, start_y);
     this->_write_addr_reg(_X_ADDR_END_H, end_x, end_y);
@@ -552,7 +458,7 @@ void OV5640::_set_size_and_colorspace(void) {
 
     this->_set_colorspace();
 
-    this->_i2c_device->end();
+    //this->_i2c_device->end();
 
 }
 
@@ -577,11 +483,11 @@ void OV5640::_set_pll(
         return;
     }   
 
-    this->_write_register(0x3039, bypass == 1 ? 0x80 : 0);
+    this->_write_register(0x3039, (bypass ? 0x80 : 0));
     this->_write_register(0x3034, 0x1A);
     this->_write_register(0x3035, 1 | ((sys_div & 0xF) << 4));
     this->_write_register(0x3036, multiplier & 0xFF);
-    this->_write_register(0x3037, (pre_div & 0xF) | (root_2x == 1 ? 0x10 : 0));
+    this->_write_register(0x3037, (pre_div & 0xF) | (root_2x ? 0x10 : 0));
     this->_write_register(0x3108, (pclk_root_div & 3) << 4 | 0x06);
     this->_write_register(0x3824, pclk_div & 0x1F);
     this->_write_register(0x460C, 0x22);
@@ -614,13 +520,13 @@ void OV5640::flip_y(bool value) {
 bool OV5640::test_pattern() const { return this->_test_pattern; }
 void OV5640::test_pattern(bool value) {
     this->_test_pattern = value;
-    this->_i2c_device->begin();
+    //this->_i2c_device->begin();
 
-    while(this->_i2c_device->available());
+    //while(this->_i2c_device->available());
 
     this->_write_register(_PRE_ISP_TEST_SETTING_1, value << 7);
     
-    this->_i2c_device->end();
+    //this->_i2c_device->end();
 }
 
 int OV5640::saturation(void) const { return this->_saturation; }
@@ -629,11 +535,11 @@ void OV5640::saturation(int value) {
         Serial.printf("Invalid saturation %d, use value from -4..4 inclusive\r\n", value);
         return;
     }
-    const int* _this_sensor_saturation_levels = _sensor_saturation_levels[value + 4];
+    //const int* _this_sensor_saturation_levels = _sensor_saturation_levels[value + 4];
 
     // this->_i2c_device->setClock(100000);
     for (int offset = 0; offset < 11; offset++) {
-        int reg_value = _this_sensor_saturation_levels[offset];
+        int reg_value = _sensor_saturation_levels[value + 4][offset];
         this->_write_register(0x5381 + offset, reg_value);
     }
     // this->_i2c_device->end();
@@ -643,11 +549,11 @@ void OV5640::saturation(int value) {
 int OV5640::effect(void) const { return this->_effect; }
 void OV5640::effect(int value) {
     int reg_addr[4] = { 0x5580, 0x5583, 0x5584, 0x5003 };
-    const int* _this_sensor_special_effects = _sensor_special_effects[value];
+    //const int* _this_sensor_special_effects = _sensor_special_effects[value];
     // this->_i2c_device->setClock(100000);
     //this->_i2c_device->begin(_i2c_bus[0], _i2c_bus[1]);
     for (int i = 0; i < 4; i++) {
-        int reg_value = _this_sensor_special_effects[i];
+        int reg_value = _sensor_special_effects[value][i];
         this->_write_register(reg_addr[i], reg_value);
     }
     // this->_i2c_device->end();
@@ -696,7 +602,7 @@ void OV5640::brightness(int value) {
         Serial.printf("Invalid brightness value %d, use a value from -4..4 inclusive\r\n", value);
         return;
     }
-    int temp[4] = { 0x5587, abs(value) << 4, 0x5588, value < 0 ? 0x9 : 0x1 };
+    int temp[4] = { 0x5587, abs(value) << 4, 0x5588, (value < 0 ? 0x9 : 0x1) };
 
     //this->_i2c_device->begin(_i2c_bus[0], _i2c_bus[1]);
     // this->_i2c_device->setClock(100000);
@@ -719,8 +625,8 @@ void OV5640::contrast(int value) {
         Serial.printf("Invalid contrast value %d, use a value from -3..3 inclusive\r\n", value);
         return;
     }
-    const int* setting = _contrast_settings[value + 3];
-    int temp[4] = { 0x5586, setting[0], 0x5585, setting[1] };
+    //const int* setting = _contrast_settings[value + 3];
+    int temp[4] = { 0x5586, _contrast_settings[value + 3][0], 0x5585, _contrast_settings[value + 3][1] };
     //this->_i2c_device->begin(_i2c_bus[0], _i2c_bus[1]);
     // this->_i2c_device->setClock(100000);
     this->_write_group_3_settings(temp);
@@ -733,16 +639,16 @@ void OV5640::exposure_value(int value) {
         Serial.printf("Invalid exposure value %d, use a value from -3..3 inclusive\r\n", value);
         return;
     }
-    const int* _this_sensor_ev_values = _sensor_ev_levels[value + 3];
+    // const int* _this_sensor_ev_values = _sensor_ev_levels[value + 3];
 
     //this->_i2c_device->begin(_i2c_bus[0], _i2c_bus[1]);
     // this->_i2c_device->setClock(100000);
     for (int offset = 0; offset < 6; offset++) {
-        int reg_value = _this_sensor_ev_values[offset];
+        int reg_value = _sensor_ev_levels[value + 3][offset];
         this->_write_register(0x5381 + offset, reg_value);
     }
     // this->_i2c_device->end();
-    this->_ev = value;
+    //this->_ev = value;
 }
 
 int OV5640::white_balance(void) const { return this->_white_balance; }
@@ -751,14 +657,14 @@ void OV5640::white_balance(int value) {
         Serial.printf("Invalid white balance value %d, use one of the OV5640_WHITE_BALANCE_* constants", value);
         return;
     }
-    const int* _this_light_mode = _light_modes[value];
+    //const int* _this_light_mode = _light_modes[value];
 
     //this->_i2c_device->begin(_i2c_bus[0], _i2c_bus[1]);
     // this->_i2c_device->setClock(100000);
     this->_write_register(0x3212, 0x3);
     for (int i = 0; i < 7; i++) {
         int reg_addr = _light_registers[i];
-        int reg_value = _this_light_mode[i];
+        int reg_value = _light_modes[value][i];
         this->_write_register(reg_addr, reg_value);
     }
     this->_write_register(0x3212, 0x13);
@@ -769,7 +675,7 @@ void OV5640::white_balance(int value) {
 bool OV5640::night_mode(void) {
     //this->_i2c_device->begin(_i2c_bus[0], _i2c_bus[1]);
     // this->_i2c_device->setClock(100000);
-    bool value = this->_read_register(0x3A00 & 0x04); 
+    bool value = this->_read_register(0x3A00) & 0x04; 
     // this->_i2c_device->end();
     return value;
 }

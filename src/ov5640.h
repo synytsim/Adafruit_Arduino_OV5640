@@ -301,7 +301,7 @@ Arduino driver for adafruit OV5640 camera
 #define _ASPECT_RATIO_1X1 7
 #define _ASPECT_RATIO_9X16 8
 
-const int _resolution_info[18][3] = {
+const int _resolution_info[][3] = {
     {96, 96, _ASPECT_RATIO_1X1},  // 96x96
     {160, 120, _ASPECT_RATIO_4X3},  // QQVGA
     {176, 144, _ASPECT_RATIO_5X4},  // QCIF
@@ -336,7 +336,7 @@ const int _resolution_info[18][3] = {
 // }
 
 
-const int _ratio_table[9][10] = {
+const int _ratio_table[][10] = {
     // mw,  mh, sx, sy, ex,   ey,   ox, oy,  tx,   ty
     {2560, 1920, 0, 0, 2623, 1951, 32, 16, 2844, 1968},  // 4x3
     {2560, 1704, 0, 110, 2623, 1843, 32, 16, 2844, 1752},  // 3x2
@@ -349,8 +349,8 @@ const int _ratio_table[9][10] = {
     {1088, 1920, 736, 0, 1887, 1951, 32, 16, 1884, 1968},  // 9x16
 };
 
-const float _pll_pre_div2x_factors[9] = {1, 1, 2, 3, 4, 1.5, 6, 2.5, 8};
-const int _pll_pclk_root_div_factors[4] = {1,2,4,8};
+const float _pll_pre_div2x_factors[] = {1, 1, 2, 3, 4, 1.5, 6, 2.5, 8};
+const int _pll_pclk_root_div_factors[] = {1,2,4,8};
 
 #define _REG_DLY 0xFFFF
 #define _REGLIST_TAIL = 0x0000
@@ -506,10 +506,10 @@ const int _sensor_default_regs[] = {
     0x558B, 0xF8,
     0x501D, 0x40,  // enable manual offset of contrast
     // power on
-    0x3008, 0x02,
+    0x3008, 0x2,
     // 50Hz
     0x3C00, 0x04,
-    _REG_DLY, 300
+    //_REG_DLY, 300
 };
 
 const int _reset_awb[] = {
@@ -683,7 +683,7 @@ const int _sensor_format_rgb565[] = {
     _CLOCK_ENABLE02, 0xC3, // reset to how it was before (no jpg clock)
 };
 
-const int _ov5640_color_settings_size[4] = { 8, 4, 4, 10 };
+const int _ov5640_color_settings_size[] = { 8, 4, 4, 10 };
 
 // const int* _ov5640_color_settings[4] = {
 //     _sensor_format_rgb565,
@@ -692,7 +692,7 @@ const int _ov5640_color_settings_size[4] = { 8, 4, 4, 10 };
 //     _sensor_format_jpeg,
 // };
 
-const int _contrast_settings[7][2] = {
+const int _contrast_settings[][2] = {
     {0x20, 0x00}, //  0
     {0x24, 0x10}, // +1
     {0x28, 0x18}, // +2
@@ -702,7 +702,7 @@ const int _contrast_settings[7][2] = {
     {0x1c, 0x1c}, // -1
 };
 
-const int _sensor_saturation_levels[9][11] = {
+const int _sensor_saturation_levels[][11] = {
     {0x1D, 0x60, 0x03, 0x0C, 0x78, 0x84, 0x7D, 0x6B, 0x12, 0x01, 0x98},  // 0
     {0x1D, 0x60, 0x03, 0x0D, 0x84, 0x91, 0x8A, 0x76, 0x14, 0x01, 0x98},  // +1
     {0x1D, 0x60, 0x03, 0x0E, 0x90, 0x9E, 0x96, 0x80, 0x16, 0x01, 0x98},  // +2
@@ -714,7 +714,7 @@ const int _sensor_saturation_levels[9][11] = {
     {0x1D, 0x60, 0x03, 0x0B, 0x6C, 0x77, 0x70, 0x60, 0x10, 0x01, 0x98},  // -1
 };
 
-const int _sensor_ev_levels[7][6] = {
+const int _sensor_ev_levels[][6] = {
     {0x38, 0x30, 0x61, 0x38, 0x30, 0x10}, //  0
     {0x40, 0x38, 0x71, 0x40, 0x38, 0x10}, // +1
     {0x50, 0x48, 0x90, 0x50, 0x48, 0x20}, // +2
@@ -730,8 +730,8 @@ const int _sensor_ev_levels[7][6] = {
 #define OV5640_WHITE_BALANCE_CLOUDY 3
 #define OV5640_WHITE_BALANCE_INCANDESCENT 4
 
-const int _light_registers[7] = { 0x3406, 0x3400, 0x3401, 0x3402, 0x3403, 0x3404, 0x3405 };
-const int _light_modes[5][7] = {
+const int _light_registers[] = { 0x3406, 0x3400, 0x3401, 0x3402, 0x3403, 0x3404, 0x3405 };
+const int _light_modes[][7] = {
     {0x00, 0x04, 0x00, 0x04, 0x00, 0x04, 0x00}, // auto
     {0x01, 0x06, 0x1c, 0x04, 0x00, 0x04, 0xf3}, // sunny
     {0x01, 0x05, 0x48, 0x04, 0x00, 0x07, 0xcf}, // office / fluorescent
@@ -747,7 +747,7 @@ const int _light_modes[5][7] = {
 #define OV5640_SPECIAL_EFFECT_BLUE_TINT 5
 #define OV5640_SPECIAL_EFFECT_SEPIA 6
 
-const int _sensor_special_effects[7][4] = {
+const int _sensor_special_effects[][4] = {
     {0x06, 0x40, 0x10, 0x08},  // Normal
     {0x46, 0x40, 0x28, 0x08},  // Negative
     {0x1E, 0x80, 0x80, 0x08},  // Grayscale
@@ -757,7 +757,7 @@ const int _sensor_special_effects[7][4] = {
     {0x1E, 0x40, 0xA0, 0x08},  // Sepia
 };
 
-const int _sensor_regs_gamma0[34] = {
+const int _sensor_regs_gamma0[] = {
     0x5480, 0x01,
     0x5481, 0x08,
     0x5482, 0x14,
@@ -777,7 +777,7 @@ const int _sensor_regs_gamma0[34] = {
     0x5490, 0x1D,
 };
 
-const int sensor_regs_gamma1[34] = {
+const int sensor_regs_gamma1[] = {
     0x5480, 0x1,
     0x5481, 0x0,
     0x5482, 0x1E,
@@ -797,7 +797,7 @@ const int sensor_regs_gamma1[34] = {
     0x5490, 0x1D,
 };
 
-const int sensor_regs_awb0[62] = {
+const int sensor_regs_awb0[] = {
     0x5180, 0xFF,
     0x5181, 0xF2,
     0x5182, 0x00,
@@ -967,7 +967,7 @@ class OV5640 : public _SCCB16CameraBase
             size (int): The captured image size
         */
 
-        OV5640(TwoWire *i2c_device, int* data_pins, int clock, int vsync, int href, int shutdown = -1, int reset = -1, int mclk = -1, int mclk_frequency = 120000000, int i2c_address = 0x3C, int size = OV5640_SIZE_QQVGA);
+        OV5640(TwoWire *i2c_device, int* data_pins, int clock, int vsync, int href, int shutdown = -1, int reset = -1, int mclk = -1, int mclk_frequency = 20000000, int i2c_address = 0x3C, int size = OV5640_SIZE_QQVGA);
 
         ~OV5640();
 
