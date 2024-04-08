@@ -506,10 +506,10 @@ const int _sensor_default_regs[] = {
     0x558B, 0xF8,
     0x501D, 0x40,  // enable manual offset of contrast
     // power on
-    0x3008, 0x2,
+    // 0x3008, 0x2,
     // 50Hz
     0x3C00, 0x04,
-    //_REG_DLY, 300
+    _REG_DLY, 300
 };
 
 const int _reset_awb[] = {
@@ -865,9 +865,18 @@ class _RegBits16
         // void __set__(void* obj, int value);
 };
 
+
 class _SCCB16CameraBase
 {
+
     protected:
+
+        typedef enum OV5640_ERRORS {
+            OK,
+            I2C,
+        } OV5640_ERR;
+
+        OV5640_ERR OV5640_ERROR = OK;
     
         int _colorspace;
         bool _flip_x;
@@ -886,9 +895,11 @@ class _SCCB16CameraBase
         //int *_i2c_bus;
         uint8_t _i2c_address;
 
-    public:
+    // public:
     
         //_SCCB16CameraBase();
+
+        OV5640_ERR _getLastError(void);
 
         void _write_register(int reg, int value);
 
@@ -934,6 +945,9 @@ class OV5640 : public _SCCB16CameraBase
         void _set_pll(bool bypass, int multiplier, int sys_div, int pre_div, bool root_2x, int pclk_root_div, bool pclk_manual, int pclk_div);
 
         void _write_group_3_settings(int* settings);
+
+        void _powerOn(void);
+        void _powerOff(void);
 
         // static void ready();
         // static void suspend();

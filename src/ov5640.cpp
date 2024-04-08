@@ -1,5 +1,9 @@
 #include "ov5640.h"
 
+_SCCB16CameraBase::OV5640_ERR _SCCB16CameraBase::_getLastError() {
+    return OV5640_ERROR;
+}
+
 void _SCCB16CameraBase::_write_register(int reg, int value) {
     byte b[3];
     b[0] = reg >> 8;
@@ -11,13 +15,20 @@ void _SCCB16CameraBase::_write_register(int reg, int value) {
     // Serial.println(b[2], BIN);
 
     int numByteSent = 0;
+    // this->_i2c_device->begin();
     this->_i2c_device->beginTransmission(this->_i2c_address);
     numByteSent = this->_i2c_device->write(b, 3);
     int result = this->_i2c_device->endTransmission();
+    // this->_i2c_device->end();
 
-    if (result != 0) Serial.printf("write to register 0x%.2X failed, error: %d\r\n", reg, result);
+    if (result != 0) { 
+        Serial.printf("write to register 0x%.2X failed, error: %d\r\n", reg, result);
+        OV5640_ERROR = I2C;
+        return;
+    }
+    OV5640_ERROR = OK;
     //delay(300);
-    else Serial.printf("write to register 0x%.2X success, wrote %d bytes\r\n", reg, numByteSent);
+    //else Serial.printf("write to register 0x%.2X success, wrote %d bytes\r\n", reg, numByteSent);
 }
 
 void _SCCB16CameraBase::_write_addr_reg(int reg, int x_value, int y_value) {
@@ -35,14 +46,17 @@ int _SCCB16CameraBase::_read_register(int reg) {
     b[0] = reg >> 8;
     b[1] = reg & 0xFF;
 
+    // this->_i2c_device->begin();
     this->_i2c_device->beginTransmission(this->_i2c_address);
     this->_i2c_device->write(b, 2);
     this->_i2c_device->endTransmission();
 
     this->_i2c_device->requestFrom(this->_i2c_address, 1);
-    while (this->_i2c_device->available()) {
-        b[0] = this->_i2c_device->read();
-    }
+    //while (this->_i2c_device->available()) {
+    return this->_i2c_device->read();
+    b[0] = this->_i2c_device->read();
+    // this->_i2c_device->end();
+    //}
 
     Serial.printf("reading from register 0x%.2X, returned: %d\r\n", reg, b[0]);
     return b[0];
@@ -88,28 +102,70 @@ OV5640::OV5640(TwoWire* i2c_device, int* data_pins, int pixel_clock, int vsync, 
     this->size = size;
 }
 
-void OV5640::init(void) {
-    
+volatile uint32_t *vsync_reg, *hsync_reg;
+uint32_t vsync_bit, hsync_bit;
+
+void OV5640::init() {
+
+    this->_colorspace = OV5640_COLOR_RGB;
+    this->_flip_x = 0;
+    this->_flip_y = 0;
+    this->_w = 0;
+    this->_h = 0;
+    this->_size = 0;
+    this->_binning = 0;
+    this->_scale = 0;
+    this->_ev = 0;
+    this->_white_balance = 0;
+    this->size = size;
 
     // this->_i2c_device->begin();
     // this->_i2c_device->setClock(100000);
-
     // delay(1); 
 
-    if (this->reset > 0)
-    pinMode(this->reset, OUTPUT);
-    digitalWrite(this->reset, HIGH);
-    delay(2);
-    digitalWrite(this->reset, LOW);
-    delay(2);
+    if (this->reset > 0) {
+        pinMode(this->reset, OUTPUT);
+        digitalWrite(this->reset, LOW);
+    }
 
-    digitalWrite(this->reset, HIGH);
-    pinMode(this->reset, INPUT);
+    if (this->shutdown > 0) {
+        pinMode(this->shutdown, OUTPUT);
+        digitalWrite(this->shutdown, HIGH);
+        delay(5);
+        digitalWrite(this->shutdown, LOW);
+    }
 
-    delay(20);
+    if (this->reset > 0) {
+        delay(1);
+        digitalWrite(this->reset, HIGH);
+        delay(20);
+    }
 
+    // delay(2);
+    // digitalWrite(this->reset, LOW);
+    // delay(2);
+
+    // digitalWrite(this->reset, HIGH);
+    // pinMode(this->reset, INPUT);
+
+    // delay(20);
+
+    Serial.print("CAM CHIP ID: ");
+
+    uint16_t chip_id = this->getChipId();
+    Serial.println(chip_id, HEX);
+
+    if (chip_id != 0x5640) {
+        Serial.println("WARNING: CHIP ID INVALID!");
+    }
+
+    Serial.println("INITIALIZING CAMERA");
 
     this->_write_list(_sensor_default_regs, int(sizeof(_sensor_default_regs) / sizeof(int)));
+
+    // Serial.print("CAM CHIP ID: ");
+
+    // Serial.println(this->getChipId(), HEX);
 
     PCC->MR.bit.PCEN = 0;
     //Serial.println(PCC->MR.bit.PCEN);
@@ -153,20 +209,16 @@ void OV5640::init(void) {
     //             PCC_MR_ALWYS(0x0) |
     //             PCC_MR_SCALE(0x0) |
     //             PCC_MR_DSIZE(0x2);  // "4 data" at a time (accumulate in RHR)
-    
-    PCC->MR.bit.PCEN = 1;
 
-    this->_colorspace = OV5640_COLOR_RGB;
-    this->_flip_x = 0;
-    this->_flip_y = 0;
-    this->_w = 0;
-    this->_h = 0;
-    this->_size = 0;
-    this->_binning = 0;
-    this->_scale = 0;
-    this->_ev = 0;
-    this->_white_balance = 0;
-    this->size = size;
+    //PCC->MR.bit.PCEN = 1;
+
+    volatile uint32_t *vsync_reg, *hsync_reg;
+    uint32_t vsync_bit, hsync_bit;
+
+    vsync_reg = &PORT->Group[g_APinDescription[this->vsync].ulPort].IN.reg;
+    vsync_bit = 1ul << g_APinDescription[this->vsync].ulPin;
+    hsync_reg = &PORT->Group[g_APinDescription[this->href].ulPort].IN.reg;
+    hsync_bit = 1ul << g_APinDescription[this->href].ulPin;
 
 }
 
@@ -180,6 +232,36 @@ int OV5640::getChipId(void) {
 
 uint16_t *buf = NULL;
 
+static bool OV5640_POWER_ON = 0;
+void OV5640::_powerOn() {
+    //digitalWrite(this->shutdown, LOW);
+    //delay(1);
+    if (!OV5640_POWER_ON) {
+        this->_write_register(_SYSTEM_CTROL0, 0x2); // power on
+
+        while (this->_getLastError() == I2C) {
+            this->_write_register(_SYSTEM_CTROL0, 0x2);
+        }
+    }
+    //Serial.println("Power On");
+    OV5640_POWER_ON = 1;
+}
+
+void OV5640::_powerOff() {
+    // use shutdown pin here?
+    //digitalWrite(this->shutdown, HIGH);
+    //delay(5);
+    if (OV5640_POWER_ON) {
+        this->_write_register(_SYSTEM_CTROL0, 0x42); // power off
+        
+        while (this->_getLastError() == I2C) {
+            this->_write_register(_SYSTEM_CTROL0, 0x42);
+        }
+    }
+    //Serial.println("Power Off");
+    OV5640_POWER_ON = 0;
+}
+
 // PARALLEL CAPTURE STUFF!!!!
 void OV5640::capture(void) {
 
@@ -190,101 +272,71 @@ void OV5640::capture(void) {
     if (buf != NULL) free(buf);
     buf = NULL;
 
-    buf = (uint16_t*)malloc(sizeof(uint16_t) * bufSize);
+    //Serial.println("Attempting malloc()");
+
+    buf = (uint16_t*)malloc(sizeof(uint8_t) * bufSize);
 
     if (buf == NULL) {
-        Serial.println("malloc failed!");
+        Serial.println("malloc() failed!");
         return;
     }
 
+    Serial.println("malloc() success");
+
     //Serial.println("taking photo");
 
+    uint8_t _temp = (this->quality());
+    uint8_t _q = _temp >> 1;
+    
+    uint16_t _width = this->_w / (_q > 0 ? 1 : _q);
+    uint16_t _height = this->_h / (_q > 0 ? 1 : _q);
 
-    // uint32_t tempBufferSize = bufSize / 4;
+    Serial.printf("Width: %d, Heigth: %d, Total: %d, Quality: %d", _width, _height, bufSize, _temp);
+    Serial.println();
 
-    // uint32_t tempBuffer[tempBufferSize];
-
-    volatile uint32_t *vsync_reg, *hsync_reg;
-    uint32_t vsync_bit, hsync_bit;
-
-    vsync_reg = &PORT->Group[g_APinDescription[this->vsync].ulPort].IN.reg;
-    vsync_bit = 1ul << g_APinDescription[this->vsync].ulPin;
-    hsync_reg = &PORT->Group[g_APinDescription[this->href].ulPort].IN.reg;
-    hsync_bit = 1ul << g_APinDescription[this->href].ulPin;
-    delay(500);
-
-    // while(tempBufIdx < tempBufferSize) {
-    //     //Serial.printf("%08lx\r\n", __builtin_bswap32(PCC->RHR.reg));
-    //     //tempBufIdx++;
-    //     while(!PCC->ISR.bit.DRDY)
-    //      ;
-
-    //     // if (PCC->ISR.bit.OVRE == 1) {
-    //     //     tempBufIdx += 1;
-    //     //     continue;
-    //     // }
-    //     // //Serial.println(PCC->RHR.bit.RDATA);
-
-    //     *tempBufPtr++ = PCC->RHR.reg;
-
-    // }
+    _width = _width >> 1;
 
     uint32_t *bufPtr = (uint32_t*)buf;
 
-    // uint16_t width = this->_w / 2;
+    this->_powerOn();
+    delay(300);
 
-    // for (uint16_t y = 0; y < this->_h; y++) {
-    //     for (int x = 0; x < width; x++) {
-    //         while (PCC->ISR.bit.DRDY == 0)
-    //             ;
-    //         *bufPtr++ = PCC->RHR.reg;
-    //     }
-    // }
-
-    // while(bufferIdx < bufferSize) {
-    //     //Serial.println("A");
-    //     if (!PCC->ISR.bit.DRDY) {
-    //         *bufPtr++ = PCC->RHR.reg;
-    //         //Serial.println("B");
-    //     }
-    // }
-
-    //return;
-
-
-    //Serial.println("A");
-
+    PCC->MR.bit.PCEN = 1;
 
     while(*vsync_reg & vsync_bit)
         ;
-    //Serial.println("A");
 
     noInterrupts();
 
     while(!*vsync_reg & vsync_bit)
         ;
-    //Serial.println("B");
+    //Serial.println("A");
 
-    uint16_t width = this->_w / 2;
-
-    for (uint16_t y = 0; y < this->_h; y++) {
+    for (uint16_t y = 0; y < _height; y++) {
         while (*hsync_reg & hsync_bit)
             ;
-        //Serial.println("C");
+
         while (!*hsync_reg & hsync_bit)
             ;
-        //Serial.println("D");
 
-        for (int x = 0; x < width; x++) {
+        //Serial.println("B");
+        
+
+        for (int x = 0; x < _width; x++) {
             while (!PCC->ISR.bit.DRDY)
                 ;
-            //Serial.println("a");
+            //Serial.println("C");
             *bufPtr++ = PCC->RHR.reg;
-            //Serial.println(PCC->RHR.reg);
         }
     }
 
+    PCC->MR.bit.PCEN = 0;
+
     interrupts();
+
+    //delay(100);
+
+    //this->_powerOff();
 
     // PCC->WPMR.bit.WPEN = 0;
     //PCC->MR.bit.PCEN = 0;
@@ -294,17 +346,24 @@ void OV5640::capture(void) {
 }
 
 void OV5640::dump(void) {
+    uint8_t _q = (this->quality()) >> 1;
+    
+    uint16_t _width = (this->_w / (_q > 0 ? 1 : _q));
+    uint16_t _height = (this->_h / (_q > 0 ? 1 : _q));
+
     Serial.println("Dumping buffer...");
-    for (int y = 0; y < _h; y++) {
-        for (int x = 0; x < _w; x++) {
+    for (int y = 0; y < _height; y++) {
+        for (int x = 0; x < _width; x++) {
             Serial.printf("0x%.4X", buf[y * x + x]);
-            //Serial.printf("0x%.2X", y * x + x);
             Serial.print(" ");
+            //delay(1);
         }
         Serial.println();
-        delay(1);
+        //delay(1);
     }
+    Serial.printf("Width: %d, Heigth: %d", _width, _height);
     Serial.println();
+
 }
 
 int OV5640::capture_buffer_size(void) {
@@ -425,9 +484,9 @@ void OV5640::_set_size_and_colorspace(void) {
 
     this->_scale = !((width == max_width && height == max_height) || (width == max_width / 2 && height == max_height / 2));
 
-    //this->_i2c_device->begin();
+    // this->_i2c_device->begin();
 
-    // while(_i2c_device->available())
+    // while(!(_i2c_device->available()))
     //     ;
 
     this->_write_addr_reg(_X_ADDR_ST_H, start_x, start_y);
