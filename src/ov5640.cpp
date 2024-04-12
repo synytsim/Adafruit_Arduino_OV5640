@@ -54,10 +54,8 @@ int _SCCB16CameraBase::_read_register(int reg) {
     this->_i2c_device->requestFrom(this->_i2c_address, 1);
     //while (this->_i2c_device->available()) {
     return this->_i2c_device->read();
+    
     b[0] = this->_i2c_device->read();
-    // this->_i2c_device->end();
-    //}
-
     Serial.printf("reading from register 0x%.2X, returned: %d\r\n", reg, b[0]);
     return b[0];
 }
@@ -107,7 +105,7 @@ uint32_t vsync_bit, hsync_bit;
 
 void OV5640::init() {
 
-    this->_colorspace = OV5640_COLOR_RGB;
+    this->_colorspace = OV5640_COLOR_JPEG;
     this->_flip_x = 0;
     this->_flip_y = 0;
     this->_w = 0;
@@ -163,10 +161,6 @@ void OV5640::init() {
 
     this->_write_list(_sensor_default_regs, int(sizeof(_sensor_default_regs) / sizeof(int)));
 
-    // Serial.print("CAM CHIP ID: ");
-
-    // Serial.println(this->getChipId(), HEX);
-
     PCC->MR.bit.PCEN = 0;
     //Serial.println(PCC->MR.bit.PCEN);
     //delay(1000);
@@ -212,8 +206,8 @@ void OV5640::init() {
 
     //PCC->MR.bit.PCEN = 1;
 
-    volatile uint32_t *vsync_reg, *hsync_reg;
-    uint32_t vsync_bit, hsync_bit;
+    // volatile uint32_t *vsync_reg, *hsync_reg;
+    // uint32_t vsync_bit, hsync_bit;
 
     vsync_reg = &PORT->Group[g_APinDescription[this->vsync].ulPort].IN.reg;
     vsync_bit = 1ul << g_APinDescription[this->vsync].ulPin;
@@ -230,7 +224,7 @@ int OV5640::getChipId(void) {
     return this->_read_register16(_CHIP_ID_HIGH);
 }
 
-uint16_t *buf = NULL;
+uint8_t *buf = NULL;
 
 static bool OV5640_POWER_ON = 0;
 void OV5640::_powerOn() {
@@ -267,14 +261,15 @@ void OV5640::capture(void) {
 
     Serial.println("Attemping capture...");
 
-    uint32_t bufSize = capture_buffer_size();
+    //uint32_t bufSize = capture_buffer_size();
+    uint32_t bufSize = _w * _h;
 
     if (buf != NULL) free(buf);
     buf = NULL;
 
     //Serial.println("Attempting malloc()");
 
-    buf = (uint16_t*)malloc(sizeof(uint8_t) * bufSize);
+    buf = (uint8_t*)malloc(bufSize);
 
     if (buf == NULL) {
         Serial.println("malloc() failed!");
@@ -285,23 +280,28 @@ void OV5640::capture(void) {
 
     //Serial.println("taking photo");
 
-    uint8_t _temp = (this->quality());
-    uint8_t _q = _temp >> 1;
+    // uint8_t _temp = (this->quality());
+    // uint8_t _q = _temp >> 1;
     
-    uint16_t _width = this->_w / (_q > 0 ? 1 : _q);
-    uint16_t _height = this->_h / (_q > 0 ? 1 : _q);
+    // uint16_t _width = this->_w / (_q > 0 ? 1 : _q);
+    // uint16_t _height = this->_h / (_q > 0 ? 1 : _q);
 
-    Serial.printf("Width: %d, Heigth: %d, Total: %d, Quality: %d", _width, _height, bufSize, _temp);
+    uint16_t _width = this->_w;
+    uint16_t _height = this->_h;
+
+    Serial.printf("Width: %d, Heigth: %d, Total: %d", _width, _height, bufSize);
     Serial.println();
 
-    _width = _width >> 1;
-
+    _width = _width >> 2;
+    
     uint32_t *bufPtr = (uint32_t*)buf;
 
     this->_powerOn();
     delay(300);
 
     PCC->MR.bit.PCEN = 1;
+
+    //Serial.println("START");
 
     while(*vsync_reg & vsync_bit)
         ;
@@ -322,10 +322,14 @@ void OV5640::capture(void) {
         //Serial.println("B");
         
 
-        for (int x = 0; x < _width; x++) {
+        for (uint16_t x = 0; x < _width; x++) {
             while (!PCC->ISR.bit.DRDY)
                 ;
+            // if (PCC->ISR.bit.OVRE)
+            //     ;
+            
             //Serial.println("C");
+            
             *bufPtr++ = PCC->RHR.reg;
         }
     }
@@ -333,6 +337,8 @@ void OV5640::capture(void) {
     PCC->MR.bit.PCEN = 0;
 
     interrupts();
+
+    //Serial.println("END");
 
     //delay(100);
 
@@ -346,23 +352,39 @@ void OV5640::capture(void) {
 }
 
 void OV5640::dump(void) {
-    uint8_t _q = (this->quality()) >> 1;
+    // uint8_t _q = (this->quality()) >> 1;
     
-    uint16_t _width = (this->_w / (_q > 0 ? 1 : _q));
-    uint16_t _height = (this->_h / (_q > 0 ? 1 : _q));
+    // uint16_t _width = (this->_w / (_q > 0 ? 1 : _q));
+    // uint16_t _height = (this->_h / (_q > 0 ? 1 : _q));
 
-    Serial.println("Dumping buffer...");
-    for (int y = 0; y < _height; y++) {
-        for (int x = 0; x < _width; x++) {
-            Serial.printf("0x%.4X", buf[y * x + x]);
-            Serial.print(" ");
-            //delay(1);
-        }
-        Serial.println();
+    // Serial.println("Dumping buffer...");
+    // bool stop = 0;
+    // for (int y = 0; y < this->_h / 3; y++) {
+    //     for (int x = 0; x < this->_w / 4; x++) {
+    //         Serial.printf("0x%.2X", buf[y * x + x]);
+    //         Serial.print(" ");
+    //         if (((y * x + x) > 1) && (buf[y * x + x - 1] == 0xFF) && (buf[y * x * x] == 0xD9)) {
+    //             Serial.println("OK!!");
+    //             stop = 1;
+    //             break;
+    //         }
+    //         delay(1);
+    //     }
+    //     Serial.println();
+    //     if (stop) break;
+    //     delay(1);
+    // }
+    // Serial.printf("Width: %d, Heigth: %d", _width, _height);
+    // Serial.println();
+
+    Serial.println("START");
+
+    for (uint32_t i = 0; i < _w * _h; i++) {
+        Serial.println(buf[i]);
+        if (i > 1 && buf[i - 1] == 0xFF && buf[i] == 0xD9) break;
         //delay(1);
     }
-    Serial.printf("Width: %d, Heigth: %d", _width, _height);
-    Serial.println();
+    Serial.println("END");
 
 }
 
@@ -620,11 +642,7 @@ void OV5640::effect(int value) {
 }
 
 int OV5640::quality(void) { 
-    //this->_i2c_device->begin(_i2c_bus[0], _i2c_bus[1]);
-    // this->_i2c_device->setClock(100000);
-    int value = _read_register(_COMPRESSION_CTRL07) & 0x3F; 
-    // this->_i2c_device->end();
-    return value;
+    return _read_register(_COMPRESSION_CTRL07) & 0x3F; 
 }
 
 void OV5640::quality(int value) {
